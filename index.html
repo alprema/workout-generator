@@ -1,0 +1,239 @@
+<html>
+  <head>
+	<title>Workout generator</title>
+	<style>
+		[v-cloak] {
+		  display: none;
+		}
+		.title-row {
+			padding: 50px;
+		}
+	</style>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.css">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
+    <script type="text/javascript">
+	    $(function() {
+			new Vue({
+				el: "#main-app",
+				data: {
+					warmupDuration: 8,
+					desiredStepCount: 12,
+					stepDurationInSeconds: 30,
+					restDurationInSeconds: 10,
+					availableSteps: [],
+					workoutSteps: [],
+					
+					isBeforeStart: true,
+					isRunning: false,
+					isInRest: false,
+					isInWarmup: true,
+					warmupStart: 0,
+					startTime: 0,
+					pauseTime: 0,
+					cumulatedPauseDuration: 0,
+					currentStepTime: 0,
+					interval: null,
+					
+					speechCooldowns: {}
+				},
+				beforeCreate: function() {
+					$.getJSON('https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json').done(data => {
+						this.availableSteps = this.processWorkoutSteps(data.feed.entry);
+						this.generateWorkout();
+					} );
+				},
+				methods: {
+					generateWorkout: function() {
+						this.resetCounters();
+						this.isBeforeStart = true;
+						_.each(this.availableSteps, this.resetStep);
+						const shuffledSteps = _.shuffle(this.availableSteps);
+						let newWorkoutSteps = [];
+						let remainingStepsCount = this.desiredStepCount;
+						let previousStepBodyPart = null;
+						let time = 0;
+						while (remainingStepsCount > 0) {
+							const nextStep = _.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart);
+							nextStep.startTime = time;
+							nextStep.endTime = time + this.stepDurationInSeconds;
+							
+							previousStepBodyPart = nextStep.bodyPart;
+							_.pull(shuffledSteps, nextStep);
+							newWorkoutSteps.push(nextStep);
+							// Compute start time of next step
+							time = time + this.stepDurationInSeconds + this.restDurationInSeconds;
+							remainingStepsCount--;
+							
+						}
+						console.log('workout', newWorkoutSteps);
+						this.workoutSteps = newWorkoutSteps;
+						
+					},
+					resetStep: function (step) {
+						step.hasBeenAnnounced = false;
+						step.startTime = 0;
+						step.endTime = 0;
+						step.isCurrent = false;
+						step.isOver = false;
+					},
+					resetCounters: function() {
+						this.warmupStart = 0;
+						this.startTime = 0;
+						this.pauseTime = 0;
+						this.cumulatedPauseDuration = 0;
+						this.currentStepTime = 0;
+						this.isInRest = false;
+						this.isInWarmup = true;
+					},
+					processWorkoutSteps: function (entries) {
+						const headerNames = entries.filter(x => x.gs$cell.row === "1").map(x => ({ name: _.camelCase(x.content.$t), col: x.gs$cell.col }));
+						return _.chain(entries.filter(x => x.gs$cell.row !== "1"))
+								.groupBy(x => x.gs$cell.row)
+								.mapValues(columns => _.reduce(headerNames, (agg, x) => ({ ...agg, [x.name]: _.find(columns, ["gs$cell.col", x.col]).gs$cell.$t }), {}))
+								.value();
+					},
+					startWorkout: function () {
+						if (this.interval) {
+							clearInterval(this.interval);
+						}
+						this.resetCounters();
+						this.warmupStart = performance.now()
+						this.isRunning = true;
+						this.interval = setInterval(() => {
+							if (!this.isRunning) {
+								return;
+							}
+							this.isBeforeStart = false;
+							// Warmup
+							if (this.isInWarmup) {
+								const firstStep = this.workoutSteps[0];
+								firstStep.isCurrent = true;
+								this.isInRest = true;
+								this.sayStep(firstStep, "First exercise: ");
+								const currentWarmUpTime = (performance.now() - this.warmupStart) / 1000;
+								const remainingSeconds = Math.floor(this.warmupDuration - currentWarmUpTime) + 1;
+								this.currentStepTime = remainingSeconds;
+								this.sayRemainingSeconds(remainingSeconds, "Go!");
+								if (currentWarmUpTime < this.warmupDuration) {
+									return;
+								}
+								this.startTime = performance.now()
+								this.isInWarmup = false;
+							}
+							const currentWorkoutTime = (performance.now() - this.startTime - this.cumulatedPauseDuration) / 1000;
+							const currentStep = _.find(this.workoutSteps, x => x.endTime > currentWorkoutTime);
+							// Workout is done, exiting
+							if (!currentStep) {
+								clearInterval(this.interval);
+								return;
+							}
+							const previousStep = _.findLast(this.workoutSteps, x => x.endTime < currentStep.startTime);
+							this.isInRest = currentStep.startTime > currentWorkoutTime;
+							this.currentStepTime = (currentWorkoutTime - (this.isInRest ? currentStep.startTime - this.restDurationInSeconds : currentStep.startTime)).toFixed(2);
+							const currentStepDuration = this.isInRest ? this.restDurationInSeconds : this.stepDurationInSeconds;
+							const remainingTimeInSeconds = Math.floor(currentStepDuration - this.currentStepTime) + 1;
+							currentStep.isCurrent = true;
+							this.sayRemainingSeconds(remainingTimeInSeconds, this.isInRest ? "Go!" : "Stop!");
+							if (previousStep) {
+								previousStep.isCurrent = false;
+								previousStep.isOver = true;
+							}
+							this.sayStep(currentStep, "Next: ");
+						}, 100);
+					},
+					sayStep: function (step, prefix) {
+						if (step.hasBeenAnnounced) {
+							return;
+						}
+						this.say(prefix + step.name);
+						step.hasBeenAnnounced = true;
+					},
+					sayRemainingSeconds: function (remainingSeconds, finalWord) {
+						if (remainingSeconds < 2) {
+							this.say("1... " + finalWord);
+						} else if (remainingSeconds <= 3 && remainingSeconds > 1) {
+							this.say(remainingSeconds);
+						}
+					},
+					pauseOrResumeWorkout: function () {
+						if (this.isRunning) {
+							this.isRunning = false;
+							this.pauseTime = performance.now();						
+						} else {
+							this.isRunning = true;
+							this.cumulatedPauseDuration += performance.now() - this.pauseTime;						
+						}
+					},
+					say: function (text) {
+						// Since the update loop runs every 100ms, we want to prevent
+						// a sentence from being said many times so we have a cooldown
+						// by sentence
+						const speechCooldownInMs = 2000;
+						const currentTime = performance.now();
+						const lastUtteranceTime = this.speechCooldowns[text];
+						if (lastUtteranceTime && (currentTime - lastUtteranceTime) < speechCooldownInMs) {
+							return;
+						}
+						console.log(text);
+						this.speechCooldowns[text] = currentTime;
+						window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+					}
+				}
+			});
+
+
+
+		});
+    </script>
+  </head>
+  <body>
+	<div id="main-app" class="container-fluid" v-cloak>
+		<div class="row title-row text-center">
+			<h1>
+				Workout generator
+			</h1>
+		</div>
+		<div class="row">
+			<div class="col-sm-2">
+				<button v-if="isBeforeStart" type="button" class="btn btn-primary" v-on:click="startWorkout">Start</button>
+				<button v-else type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
+					{{ isRunning ? "Pause" : "Resume" }}							
+				</button>
+				<br/>
+				<br/>
+				<button type="button" class="btn btn-primary" v-on:click="generateWorkout">Regenerate workout</button>
+			</div>
+			<div class="col-sm">
+				<div class="row">
+					<div class="col-sm-4">
+						<h1 v-if="isBeforeStart">Press start to begin</h1>
+						<h1 v-else-if="isInWarmup">Get ready</h1>
+						<template v-else>						
+							<h1 v-if="isInRest">Rest</h1>
+							<h1 v-if="!isInRest">Workout</h1>
+						</template>
+					</div>
+					<div class="col-sm">
+						<h1 v-if="!isBeforeStart">{{ currentStepTime }}</h1>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-sm">
+						<ul class="list-group">
+							<li class="list-group-item" v-for="step in workoutSteps" v-bind:class="{ active: step.isCurrent && !isInRest, disabled: step.isOver, 'list-group-item-primary': step.isCurrent && isInRest }">
+								{{ step.name }}
+								<span class="float-right">Body part: {{ step.bodyPart }}</span>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+			<div class="col-sm-2">
+			  
+			</div>
+		</div>
+	</div>
+  </body>
+</html>
