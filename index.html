@@ -55,7 +55,14 @@
 						let previousStepBodyPart = null;
 						let time = 0;
 						while (remainingStepsCount > 0) {
-							const nextStep = _.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart);
+							let nextStep = null;
+							// The first step has to be a cardio step
+							if (remainingStepsCount == this.desiredStepCount) {
+								nextStep = _.find(shuffledSteps, x => x.type == "Cardio");
+							} else {
+								nextStep = _.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart);
+							}
+							
 							nextStep.startTime = time;
 							nextStep.endTime = time + this.stepDurationInSeconds;
 							
