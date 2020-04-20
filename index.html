@@ -136,11 +136,15 @@
 								clearInterval(this.interval);
 								return;
 							}
+							
+							// Main workout part
 							const previousStep = _.findLast(this.workoutSteps, x => x.endTime < currentStep.startTime);
 							this.isInRest = currentStep.startTime > currentWorkoutTime;
-							this.currentStepTime = (currentWorkoutTime - (this.isInRest ? currentStep.startTime - this.restDurationInSeconds : currentStep.startTime)).toFixed(2);
+							const currentStepStart = this.isInRest ? currentStep.startTime - this.restDurationInSeconds : currentStep.startTime;
+							const elapsedStepTime = currentWorkoutTime - currentStepStart;
 							const currentStepDuration = this.isInRest ? this.restDurationInSeconds : this.stepDurationInSeconds;
-							const remainingTimeInSeconds = Math.floor(currentStepDuration - this.currentStepTime) + 1;
+							const remainingTimeInSeconds = Math.floor(currentStepDuration - elapsedStepTime) + 1;
+							this.currentStepTime = remainingTimeInSeconds;
 							currentStep.isCurrent = true;
 							this.sayRemainingSeconds(remainingTimeInSeconds, this.isInRest ? "Go!" : "Stop!");
 							if (previousStep) {
