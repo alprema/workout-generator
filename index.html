@@ -18,6 +18,7 @@
 			new Vue({
 				el: "#main-app",
 				data: {
+					// Config
 					warmupDuration: 8,
 					desiredStepCount: 12,
 					stepDurationInSeconds: 30,
@@ -25,6 +26,7 @@
 					availableSteps: [],
 					workoutSteps: [],
 					
+					// Operational
 					isBeforeStart: true,
 					isRunning: false,
 					isInRest: false,
@@ -36,9 +38,12 @@
 					currentStepTime: 0,
 					interval: null,
 					
-					speechCooldowns: {}
+					// Technical
+					speechCooldowns: {},
+					audio: new Audio("https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Cambo/Music_For_Media_I/Cambo_-_03_-_Chill_Funk.mp3")
 				},
-				beforeCreate: function() {
+				created: function() {
+					this.audio.volume = 0.2;
 					$.getJSON('https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json').done(data => {
 						this.availableSteps = this.processWorkoutSteps(data.feed.entry);
 						this.generateWorkout();
@@ -108,6 +113,7 @@
 						this.resetCounters();
 						this.warmupStart = performance.now()
 						this.isRunning = true;
+						this.audio.play();
 						this.interval = setInterval(() => {
 							if (!this.isRunning) {
 								return;
@@ -171,9 +177,11 @@
 					pauseOrResumeWorkout: function () {
 						if (this.isRunning) {
 							this.isRunning = false;
+							this.audio.pause();
 							this.pauseTime = performance.now();						
 						} else {
 							this.isRunning = true;
+							this.audio.play();
 							this.cumulatedPauseDuration += performance.now() - this.pauseTime;						
 						}
 					},
@@ -208,13 +216,22 @@
 		</div>
 		<div class="row">
 			<div class="col-sm-2">
-				<button v-if="isBeforeStart" type="button" class="btn btn-primary" v-on:click="startWorkout">Start</button>
-				<button v-else type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
-					{{ isRunning ? "Pause" : "Resume" }}							
-				</button>
-				<br/>
-				<br/>
-				<button type="button" class="btn btn-primary" v-on:click="generateWorkout">Regenerate workout</button>
+				<div class="row">
+					<div class="col">
+						<button v-if="isBeforeStart" type="button" class="btn btn-primary" v-on:click="startWorkout">Start</button>
+						<button v-else type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
+							{{ isRunning ? "Pause" : "Resume" }}							
+						</button>
+						<br/>
+						<br/>
+						<button type="button" class="btn btn-primary" v-on:click="generateWorkout">Regenerate workout</button>
+					</div>
+				</div>
+				<div class="row h-100">
+					<div class="col align-bottom d-flex">
+						<a class="align-self-end" target="_blank" href="https://freemusicarchive.org/music/Cambo">Music credits</a>
+					</div>
+				</div>
 			</div>
 			<div class="col-sm">
 				<div class="row">
