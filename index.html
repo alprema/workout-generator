@@ -44,6 +44,7 @@
 				},
 				created: function() {
 					this.audio.volume = 0.2;
+					this.audio.loop = true;
 					$.getJSON('https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json').done(data => {
 						this.availableSteps = this.processWorkoutSteps(data.feed.entry);
 						this.generateWorkout();
