@@ -54,26 +54,34 @@
 					generateWorkout: function() {
 						this.resetCounters();
 						this.isBeforeStart = true;
-						_.each(this.availableSteps, this.resetStep);
 						const shuffledSteps = _.shuffle(this.availableSteps);
 						let newWorkoutSteps = [];
 						let remainingStepsCount = this.desiredStepCount;
 						let previousStepBodyPart = null;
 						let time = 0;
+						let previousSidedJob = null;
 						while (remainingStepsCount > 0) {
 							let nextStep = null;
 							// The first step has to be a cardio step
-							if (remainingStepsCount == this.desiredStepCount) {
-								nextStep = _.find(shuffledSteps, x => x.type == "Cardio");
+							if (!_.isNil(previousSidedJob)) {
+								nextStep = { ...previousSidedJob, side: "RIGHT", isSided: "FALSE" };
+								previousSidedJob = null;
+							} else if (remainingStepsCount == this.desiredStepCount) {
+								nextStep = { ..._.find(shuffledSteps, x => x.type == "Cardio") };
 							} else {
-								nextStep = _.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart);
+								nextStep = { ..._.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart)};
+							}
+							
+							if (nextStep.isSided === "TRUE") {
+								previousSidedJob = nextStep;
+								nextStep.side = "LEFT";
 							}
 							
 							nextStep.startTime = time;
 							nextStep.endTime = time + this.stepDurationInSeconds;
 							
 							previousStepBodyPart = nextStep.bodyPart;
-							_.pull(shuffledSteps, nextStep);
+							_.remove(shuffledSteps, x => x.name == nextStep.name);
 							newWorkoutSteps.push(nextStep);
 							// Compute start time of next step
 							time = time + this.stepDurationInSeconds + this.restDurationInSeconds;
@@ -83,13 +91,6 @@
 						console.log('workout', newWorkoutSteps);
 						this.workoutSteps = newWorkoutSteps;
 						
-					},
-					resetStep: function (step) {
-						step.hasBeenAnnounced = false;
-						step.startTime = 0;
-						step.endTime = 0;
-						step.isCurrent = false;
-						step.isOver = false;
 					},
 					resetCounters: function() {
 						this.warmupStart = 0;
@@ -165,7 +166,7 @@
 						if (step.hasBeenAnnounced) {
 							return;
 						}
-						this.say(prefix + step.name);
+						this.say(prefix + step.name + (step.side ? ": " + step.side : ""));
 						step.hasBeenAnnounced = true;
 					},
 					sayRemainingSeconds: function (remainingSeconds, finalWord) {
@@ -252,7 +253,7 @@
 					<div class="col-sm">
 						<ul class="list-group">
 							<li class="list-group-item" v-for="step in workoutSteps" v-bind:class="{ active: step.isCurrent && !isInRest, disabled: step.isOver, 'list-group-item-primary': step.isCurrent && isInRest }">
-								{{ step.name }}
+								{{ step.name }}{{ step.side ? ": " + _.lowerCase(step.side) : "" }}
 								<span class="float-right">Body part: {{ step.bodyPart }}</span>
 							</li>
 						</ul>
