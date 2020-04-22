@@ -53,6 +53,7 @@
 				methods: {
 					generateWorkout: function() {
 						this.resetCounters();
+						this.setIsRunning(false);
 						this.isBeforeStart = true;
 						const shuffledSteps = _.shuffle(this.availableSteps);
 						let newWorkoutSteps = [];
@@ -60,16 +61,35 @@
 						let previousStepBodyPart = null;
 						let time = 0;
 						let previousSidedJob = null;
+						let alreadyIncludedCategories = {};
 						while (remainingStepsCount > 0) {
 							let nextStep = null;
-							// The first step has to be a cardio step
+							// If the previous was a left, we do the right
 							if (!_.isNil(previousSidedJob)) {
 								nextStep = { ...previousSidedJob, side: "RIGHT", isSided: "FALSE" };
 								previousSidedJob = null;
+							// The first step has to be a cardio step
 							} else if (remainingStepsCount == this.desiredStepCount) {
 								nextStep = { ..._.find(shuffledSteps, x => x.type == "Cardio") };
 							} else {
-								nextStep = { ..._.find(shuffledSteps, x => x.bodyPart != previousStepBodyPart)};
+								nextStep = { ..._.find(shuffledSteps, (x, i) => {
+										if (remainingStepsCount == 1 && x.isSided === "TRUE") {
+											return false;
+										}
+										if (shuffledSteps.length - 1 == i) {
+											return true;
+										}										
+										
+										if (x.bodyPart == previousStepBodyPart) {
+											return false;
+										}
+										if (alreadyIncludedCategories[x.category]) {
+											return false;
+										}										
+										
+										return true;
+									}
+								)};
 							}
 							
 							if (nextStep.isSided === "TRUE") {
@@ -81,6 +101,7 @@
 							nextStep.endTime = time + this.stepDurationInSeconds;
 							
 							previousStepBodyPart = nextStep.bodyPart;
+							alreadyIncludedCategories[nextStep.category] = true;
 							_.remove(shuffledSteps, x => x.name == nextStep.name);
 							newWorkoutSteps.push(nextStep);
 							// Compute start time of next step
@@ -114,8 +135,7 @@
 						}
 						this.resetCounters();
 						this.warmupStart = performance.now()
-						this.isRunning = true;
-						this.audio.play();
+						this.setIsRunning(true);
 						this.interval = setInterval(() => {
 							if (!this.isRunning) {
 								return;
@@ -178,13 +198,19 @@
 					},
 					pauseOrResumeWorkout: function () {
 						if (this.isRunning) {
-							this.isRunning = false;
-							this.audio.pause();
+							this.setIsRunning(false);
 							this.pauseTime = performance.now();						
 						} else {
-							this.isRunning = true;
-							this.audio.play();
+							this.setIsRunning(true);							
 							this.cumulatedPauseDuration += performance.now() - this.pauseTime;						
+						}
+					},
+					setIsRunning: function (isRunning) {
+						this.isRunning = isRunning;
+						if (isRunning) {
+							this.audio.play();
+						} else {
+							this.audio.pause();
 						}
 					},
 					say: function (text) {
@@ -254,7 +280,7 @@
 						<ul class="list-group">
 							<li class="list-group-item" v-for="step in workoutSteps" v-bind:class="{ active: step.isCurrent && !isInRest, disabled: step.isOver, 'list-group-item-primary': step.isCurrent && isInRest }">
 								{{ step.name }}{{ step.side ? ": " + _.lowerCase(step.side) : "" }}
-								<span class="float-right">Body part: {{ step.bodyPart }}</span>
+								<span class="float-right badge-pill  badge-secondary">{{ step.bodyPart }}</span>
 							</li>
 						</ul>
 					</div>
