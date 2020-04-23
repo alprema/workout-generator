@@ -8,6 +8,13 @@
 		.title-row {
 			padding: 50px;
 		}
+		.image-container {
+			height: 400px;
+			text-align: center;
+		}
+		.image-container img {
+			height: 400px;
+		}
 	</style>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.css">
     <script src="./NoSleep.min.js"></script>
@@ -129,7 +136,9 @@
 						const headerNames = entries.filter(x => x.gs$cell.row === "1").map(x => ({ name: _.camelCase(x.content.$t), col: x.gs$cell.col }));
 						return _.chain(entries.filter(x => x.gs$cell.row !== "1"))
 								.groupBy(x => x.gs$cell.row)
-								.mapValues(columns => _.reduce(headerNames, (agg, x) => ({ ...agg, [x.name]: _.find(columns, ["gs$cell.col", x.col]).gs$cell.$t }), {}))
+								.mapValues(columns => _.reduce(headerNames, (agg, x) => {
+									return { ...agg, [x.name]: _.get(_.find(columns, ["gs$cell.col", x.col]), "gs$cell.$t") };
+								}, {}))
 								.value();
 					},
 					startWorkout: function () {
@@ -231,42 +240,67 @@
 						console.log(text);
 						this.speechCooldowns[text] = currentTime;
 						window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+					},
+					currentStep: function() {
+						console.log(_.get(this.workoutSteps.find(x => x.isCurrent), "imageMatchesExactly"));
+						return this.workoutSteps.find(x => x.isCurrent);
 					}
 				}
 			});
-
-
-
 		});
     </script>
   </head>
   <body>
 	<div id="main-app" class="container-fluid" v-cloak>
-		<div class="row title-row text-center">
-			<h1>
-				Workout generator
-			</h1>
-		</div>
 		<div class="row">
 			<div class="col-sm-2">
+				<div class="row title-row text-center">
+					<h1 class="text-justify">
+						Workout generator
+					</h1>
+				</div>
 				<div class="row">
 					<div class="col">
-						<button v-if="isBeforeStart" type="button" class="btn btn-primary" v-on:click="startWorkout">Start</button>
-						<button v-else type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
+						<button v-if="!isBeforeStart" type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
 							{{ isRunning ? "Pause" : "Resume" }}							
 						</button>
 						<br/>
 						<br/>
 						<button type="button" class="btn btn-primary" v-on:click="generateWorkout">Regenerate workout</button>
-					</div>
-				</div>
-				<div class="row h-100">
-					<div class="col align-bottom d-flex">
+						<br />
+						<br />
 						<a class="align-self-end" target="_blank" href="https://freemusicarchive.org/music/Cambo">Music credits</a>
 					</div>
 				</div>
 			</div>
 			<div class="col-sm">
+				<div class="row">
+					<div class="col-sm-2">
+					</div>
+					<div class="col-sm-8">
+						<div class="image-container d-flex">
+							<button v-if="isBeforeStart" type="button" class="btn btn-primary align-self-center mx-auto btn-lg" v-on:click="startWorkout">Start</button>
+							<img v-else-if="isInRest" class="align-self-center mx-auto" src="images/breathe.gif" />
+							<img v-else-if="currentStep()" class="align-self-center mx-auto" v-bind:src="currentStep().image"/>
+						</div>
+					</div>
+					<div class="col-sm-2 d-flex flex-column-reverse">
+						<span
+							v-if="!isInRest && currentStep() && currentStep().imageMatchesExactly == 'FALSE'"
+							class="align-self-end"
+							style="font-size: 10px;"
+						>
+							The image does not match exactly the exercise.
+						</span>
+						<a
+							v-if="!isInRest && currentStep() && currentStep().description"
+							v-bind:href="currentStep().description"
+							class="align-self-end"
+							target="_blank"
+							style="width: 100%"
+						>Detailed instructions</a>
+					</div>
+				</div>
 				<div class="row">
 					<div class="col-sm-4">
 						<h1 v-if="isBeforeStart">Press start to begin</h1>
