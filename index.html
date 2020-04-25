@@ -15,6 +15,10 @@
 		.image-container img {
 			height: 400px;
 		}
+		.side-menu * {
+			margin-bottom: 15px;
+			display: block;
+		}
 	</style>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.css">
     <script src="./NoSleep.min.js"></script>
@@ -86,8 +90,24 @@
 						this.resetCounters();
 						this.setIsRunning(false);
 						this.isBeforeStart = true;
-						const shuffledSteps = _.shuffle(this.availableSteps);
 						let newWorkoutSteps = [];
+						// Given the multi-constraint nature of the generation
+						// it's way simpler to just retry if all constraints cannot 
+						// be fulfilled (success rate is ~90% at 25 steps).
+						while (true) {
+							newWorkoutSteps = this._tryGenerateWorkout();
+							console.log('workout', newWorkoutSteps);
+							
+							if (!_.isNil(_.last(newWorkoutSteps).name)) {
+								break;
+							}
+							console.log('failed generation, retrying')
+						}
+						this.workoutSteps = newWorkoutSteps;
+					},
+					_tryGenerateWorkout: function() {
+						const newWorkoutSteps = [];
+						const shuffledSteps = _.shuffle(this.availableSteps);
 						let remainingStepsCount = this.desiredStepCount;
 						let previousStepBodyPart = null;
 						let time = 0;
@@ -138,11 +158,8 @@
 							// Compute start time of next step
 							time = time + this.stepDurationInSeconds + this.restDurationInSeconds;
 							remainingStepsCount--;
-							
 						}
-						console.log('workout', newWorkoutSteps);
-						this.workoutSteps = newWorkoutSteps;
-						
+						return newWorkoutSteps;
 					},
 					resetCounters: function() {
 						this.warmupStart = 0;
@@ -270,6 +287,14 @@
 					},
 					currentStep: function() {
 						return this.workoutSteps.find(x => x.isCurrent);
+					},
+					totalWorkoutDuration: function () {
+						const durationInSeconds =  this.desiredStepCount * this.stepDurationInSeconds + (this.desiredStepCount - 1) * this.restDurationInSeconds;
+						if (durationInSeconds <= 60) {
+							return durationInSeconds + " s";
+						}
+						
+						return Math.floor(durationInSeconds / 60) + ":" + durationInSeconds % 60;
 					}
 				}
 			});
@@ -286,15 +311,13 @@
 					</h1>
 				</div>
 				<div class="row">
-					<div class="col">
+					<div class="col side-menu">
 						<button v-if="!isBeforeStart" type="button" class="btn btn-primary" v-on:click="pauseOrResumeWorkout" v-bind:disabled="isInWarmup">
 							{{ isRunning ? "Pause" : "Resume" }}							
 						</button>
-						<br/>
-						<br/>
+						<input type="range" min="2" max="25" v-model:value="desiredStepCount" class="slider">
+						<span>{{ desiredStepCount}} steps - {{ totalWorkoutDuration() }}</span>
 						<button type="button" class="btn btn-primary" v-on:click="generateWorkout">Regenerate workout</button>
-						<br />
-						<br />
 						<a class="align-self-end" target="_blank" href="https://freemusicarchive.org/music/Cambo">Music credits</a>
 					</div>
 				</div>
