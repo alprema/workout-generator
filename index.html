@@ -49,7 +49,8 @@
 					// Technical
 					speechCooldowns: {},
 					audio: new Audio("https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Cambo/Music_For_Media_I/Cambo_-_03_-_Chill_Funk.mp3"),
-					noSleep: null
+					noSleep: null,
+					selectedVoice: null,
 				},
 				created: function() {
 					this.audio.volume = 0.2;
@@ -59,6 +60,26 @@
 						this.availableSteps = this.processWorkoutSteps(data.feed.entry);
 						this.generateWorkout();
 					} );
+					const vueThis = this;
+					window.speechSynthesis.onvoiceschanged = function() {
+						const voices = window.speechSynthesis.getVoices();
+						if (_.isEmpty(voices)) {
+							return;
+						}
+						console.log('All voices', voices);
+						let selectedVoice = _.find(voices, x => x.lang == "en-GB" && x.localService)
+						if (_.isNil(selectedVoice)) {
+							selectedVoice = _.find(voices, x => x.lang == "en-GB")
+						}
+						if (_.isNil(selectedVoice)) {
+							selectedVoice = _.find(voices, x => x.lang == "en-US")
+						}
+						vueThis.selectedVoice = selectedVoice;
+						console.log('Selecting voice', vueThis.selectedVoice);
+					};
+					// Since the voices can have been loaded before, we fire the event manually
+					// to ensure it is called at least once.
+					window.speechSynthesis.onvoiceschanged();
 				},
 				methods: {
 					generateWorkout: function() {
@@ -194,20 +215,6 @@
 							this.sayStep(currentStep, "Next: ");
 						}, 100);
 					},
-					sayStep: function (step, prefix) {
-						if (step.hasBeenAnnounced) {
-							return;
-						}
-						this.say(prefix + step.name + (step.side ? ": " + step.side : ""));
-						step.hasBeenAnnounced = true;
-					},
-					sayRemainingSeconds: function (remainingSeconds, finalWord) {
-						if (remainingSeconds < 2) {
-							this.say("1... " + finalWord);
-						} else if (remainingSeconds <= 3 && remainingSeconds > 1) {
-							this.say(remainingSeconds);
-						}
-					},
 					pauseOrResumeWorkout: function () {
 						if (this.isRunning) {
 							this.setIsRunning(false);
@@ -239,10 +246,29 @@
 						}
 						console.log(text);
 						this.speechCooldowns[text] = currentTime;
-						window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+						let utterance = new SpeechSynthesisUtterance(text);
+						utterance.voice = this.selectedVoice;
+						console.log('Saying with', utterance.voice);
+						window.speechSynthesis.speak(utterance);						
+					},
+					sayStep: function (step, prefix) {
+						if (step.hasBeenAnnounced) {
+							return;
+						}
+						this.say(prefix + step.name + (step.side ? ": " + step.side : ""));
+						step.hasBeenAnnounced = true;
+					},
+					sayRemainingSeconds: function (remainingSeconds, finalWord) {
+						if (remainingSeconds < 2) {
+							this.say("1... " + finalWord);
+						} else if (remainingSeconds <= 3 && remainingSeconds > 1) {
+							this.say(remainingSeconds);
+						}
+					},
+					selectVoice: function () {
+						
 					},
 					currentStep: function() {
-						console.log(_.get(this.workoutSteps.find(x => x.isCurrent), "imageMatchesExactly"));
 						return this.workoutSteps.find(x => x.isCurrent);
 					}
 				}
