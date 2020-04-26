@@ -372,7 +372,7 @@
 						<div class="image-container d-flex">
 							<img v-if="isDone" class="align-self-center mx-auto" src="images/well-done.jpg" />
 							<button v-else-if="isBeforeStart" type="button" class="btn btn-primary align-self-center mx-auto btn-lg" v-on:click="startWorkout">Start</button>
-							<img v-else-if="isInRest" class="align-self-center mx-auto" src="images/breathe.gif" />
+							<img v-else-if="isInRest && currentStepTime > 3" class="align-self-center mx-auto" src="images/breathe.gif" />
 							<img v-else-if="currentStep()" class="align-self-center mx-auto" v-bind:src="currentStep().image"/>
 						</div>
 					</div>
