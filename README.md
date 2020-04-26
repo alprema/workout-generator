@@ -1,6 +1,7 @@
 # Workout generator
 
 One-file app that generates workouts based on a series of exercices found in [a GSheet](https://docs.google.com/spreadsheets/d/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k).
+
 Try it out http://canne.tv/workout !
 
 ## Features
