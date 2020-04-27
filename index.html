@@ -49,8 +49,11 @@
 					desiredStepCount: 12,
 					stepDurationInSeconds: 30,
 					restDurationInSeconds: 10,
+					stepsUrl: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json',
+					musicsUrls: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/2/public/full?alt=json',
 					availableSteps: [],
 					workoutSteps: [],
+					workoutMusic: {},
 					
 					// Operational
 					isBeforeStart: true,
@@ -67,7 +70,7 @@
 					
 					// Technical
 					speechCooldowns: {},
-					audio: new Audio("https://files.freemusicarchive.org/storage-freemusicarchive-org/music/ccCommunity/Cambo/Music_For_Media_I/Cambo_-_03_-_Chill_Funk.mp3"),
+					audio: new Audio(),
 					noSleep: null,
 					selectedVoice: null,
 					showAdvancedControls: false,
@@ -76,10 +79,11 @@
 					this.audio.volume = 0.2;
 					this.audio.loop = true;
 					this.noSleep = new NoSleep();
-					$.getJSON('https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json').done(data => {
-						this.availableSteps = this.processWorkoutSteps(data.feed.entry);
+					$.when($.getJSON(this.stepsUrl), $.getJSON(this.musicsUrls)).done((stepsData, musicsData) => {
+						this.availableSteps = this.convertSheetEntriesToObjects(stepsData[0].feed.entry);
+						this.availableMusics = this.convertSheetEntriesToObjects(musicsData[0].feed.entry);
 						this.generateWorkout();
-					} );
+					});
 					const vueThis = this;
 					window.speechSynthesis.onvoiceschanged = function() {
 						const voices = window.speechSynthesis.getVoices();
@@ -119,6 +123,8 @@
 							}
 							console.log('failed generation, retrying')
 						}
+						this.workoutMusic = _.shuffle(this.availableMusics)[0];
+						this.audio.src = this.workoutMusic.musicUrl;
 						this.workoutSteps = newWorkoutSteps;
 					},
 					_tryGenerateWorkout: function() {
@@ -188,7 +194,7 @@
 						this.isInWarmup = true;
 						this.isDone = false;
 					},
-					processWorkoutSteps: function (entries) {
+					convertSheetEntriesToObjects: function (entries) {
 						const headerNames = entries.filter(x => x.gs$cell.row === "1").map(x => ({ name: _.camelCase(x.content.$t), col: x.gs$cell.col }));
 						return _.chain(entries.filter(x => x.gs$cell.row !== "1"))
 								.groupBy(x => x.gs$cell.row)
@@ -358,9 +364,11 @@
 							</div>
 							<div class="form-group">
 								<span>Total: {{ desiredStepCount}} steps - {{ totalWorkoutDuration() }}</span>
+								<br/>
+								<span>Music: {{ workoutMusic.title }}</span>
 							</div>
 						</div>
-						<a class="align-self-end" target="_blank" href="https://freemusicarchive.org/music/Cambo">Music credits</a>
+						<a class="align-self-end" target="_blank" v-bind:href="workoutMusic.creditsUrl">Music credits</a>
 					</div>
 				</div>
 			</div>
