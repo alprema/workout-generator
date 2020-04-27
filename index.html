@@ -49,6 +49,7 @@
 					desiredStepCount: 12,
 					stepDurationInSeconds: 30,
 					restDurationInSeconds: 10,
+					enableMusic: true,
 					stepsUrl: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json',
 					musicsUrls: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/2/public/full?alt=json',
 					availableSteps: [],
@@ -271,7 +272,9 @@
 					setIsRunning: function (isRunning) {
 						this.isRunning = isRunning;
 						if (isRunning) {
-							this.audio.play();
+							if (this.enableMusic) {
+								this.audio.play();
+							}
 							this.noSleep.enable();
 						} else {
 							this.audio.pause();
@@ -363,9 +366,13 @@
 								<input id="restDurationInput" type="range" min="10" max="60" v-model.number="restDurationInSeconds" class="form-control">
 							</div>
 							<div class="form-group">
+								<input id="enableMusicInput" type="checkbox" v-model="enableMusic">
+								<label for="enableMusicInput">Enable music</label>
+							</div>
+							<div class="form-group">
 								<span>Total: {{ desiredStepCount}} steps - {{ totalWorkoutDuration() }}</span>
 								<br/>
-								<span>Music: {{ workoutMusic.title }}</span>
+								<span>Music: <span v-bind:style="{ 'text-decoration': enableMusic ? 'none' : 'line-through'}">{{ workoutMusic.title }}</span></span>
 							</div>
 						</div>
 						<a class="align-self-end" target="_blank" v-bind:href="workoutMusic.creditsUrl">Music credits</a>
