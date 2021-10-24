@@ -50,8 +50,8 @@
 					stepDurationInSeconds: 30,
 					restDurationInSeconds: 10,
 					enableMusic: true,
-					stepsUrl: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/1/public/full?alt=json',
-					musicsUrls: 'https://spreadsheets.google.com/feeds/cells/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/2/public/full?alt=json',
+					stepsUrl: 'https://sheets.googleapis.com/v4/spreadsheets/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/values/Steps?alt=json&key=AIzaSyBfFMASooWTGZQGRV-HTTuF07O8JLvg_34',
+					musicsUrls: 'https://sheets.googleapis.com/v4/spreadsheets/1K2_ErzJK8owya1TrqEbDPVYfGLZNU5RBg4SOjLNNf4k/values/Musics?alt=json&key=AIzaSyBfFMASooWTGZQGRV-HTTuF07O8JLvg_34',
 					availableSteps: [],
 					workoutSteps: [],
 					workoutMusic: {},
@@ -81,8 +81,8 @@
 					this.audio.loop = true;
 					this.noSleep = new NoSleep();
 					$.when($.getJSON(this.stepsUrl), $.getJSON(this.musicsUrls)).done((stepsData, musicsData) => {
-						this.availableSteps = this.convertSheetEntriesToObjects(stepsData[0].feed.entry);
-						this.availableMusics = this.convertSheetEntriesToObjects(musicsData[0].feed.entry);
+						this.availableSteps = this.convertSheetEntriesToObjects(stepsData[0].values);
+						this.availableMusics = this.convertSheetEntriesToObjects(musicsData[0].values);
 						this.generateWorkout();
 					});
 					const vueThis = this;
@@ -195,14 +195,12 @@
 						this.isInWarmup = true;
 						this.isDone = false;
 					},
-					convertSheetEntriesToObjects: function (entries) {
-						const headerNames = entries.filter(x => x.gs$cell.row === "1").map(x => ({ name: _.camelCase(x.content.$t), col: x.gs$cell.col }));
-						return _.chain(entries.filter(x => x.gs$cell.row !== "1"))
-								.groupBy(x => x.gs$cell.row)
-								.mapValues(columns => _.reduce(headerNames, (agg, x) => {
-									return { ...agg, [x.name]: _.get(_.find(columns, ["gs$cell.col", x.col]), "gs$cell.$t") };
-								}, {}))
-								.value();
+					convertSheetEntriesToObjects: function (entries) {					
+						const headerNames = entries[0].map(x => _.camelCase(x));
+
+						return entries.slice(1).map(entry => entry.reduce((agg, current, index) => {
+									return { ...agg, [headerNames[index]]: current };
+								}, {}));
 					},
 					startWorkout: function () {
 						if (this.interval) {
